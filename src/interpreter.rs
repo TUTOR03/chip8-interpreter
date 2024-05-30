@@ -8,7 +8,7 @@ pub type Memory = [u8; Address::SIZE];
 
 pub struct Interpreter<P: Platform> {
   platform: P,
-  registres: [u8; 16],
+  registers: [u8; 16],
   index_register: Address,
   memory: Memory,
   instruction_address: Address,
@@ -21,7 +21,7 @@ impl<P: Platform> Interpreter<P> {
   pub fn new<E: Executable>(platform: P, executable: E) -> Self {
     let mut res = Self {
       platform,
-      registres: [0; 16],
+      registers: [0; 16],
       index_register: Address::new::<0>(),
       memory: [0; Address::SIZE],
       stack: Stack::new(),
@@ -32,10 +32,14 @@ impl<P: Platform> Interpreter<P> {
     res
   }
 
+  pub fn platform(&self) -> &P {
+    &self.platform
+  }
+
   pub fn run_one_instruction(&mut self) -> Result<(), ()> {
     let next_op_code = OpCode::from_bytes(
-      self.memory[self.instruction_address.as_u16() as usize],
-      self.memory[self.instruction_address.as_u16() as usize],
+      self.memory[self.instruction_address.as_usize()],
+      self.memory[self.instruction_address.as_usize() + 1],
     );
 
     let instruction = match Instruction::try_from(next_op_code) {
@@ -46,39 +50,39 @@ impl<P: Platform> Interpreter<P> {
     let mut instruction_step: i16 = 1;
     match instruction {
       Instruction::SkipIfEqual(reg_index, value) => {
-        if self.registres[reg_index.as_usize()] == value {
+        if self.registers[reg_index.as_usize()] == value {
           instruction_step = 2;
         }
       }
 
       Instruction::SkipIfNotEqual(reg_index, value) => {
-        if self.registres[reg_index.as_usize()] != value {
+        if self.registers[reg_index.as_usize()] != value {
           instruction_step = 2;
         }
       }
 
       Instruction::SkipIfRegistersEqual(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
         if reg_x == reg_y {
           instruction_step = 2;
         }
       }
 
       Instruction::SkipIfRegistersNotEqual(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
         if reg_x != reg_y {
           instruction_step = 2;
         }
       }
 
       Instruction::SetRegister(reg_index, value) => {
-        self.registres[reg_index.as_usize()] = value;
+        self.registers[reg_index.as_usize()] = value;
       }
 
       Instruction::CopyRegister(x_reg_index, y_reg_index) => {
-        self.registres[x_reg_index.as_usize()] = self.registres[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = self.registers[y_reg_index.as_usize()];
       }
 
       Instruction::SetAddressRegister(address) => {
@@ -86,110 +90,93 @@ impl<P: Platform> Interpreter<P> {
       }
 
       Instruction::SetRegisterRandom(reg_index, mask) => {
-        self.registres[reg_index.as_usize()] = self.platform.get_random_byte() & mask;
+        self.registers[reg_index.as_usize()] = self.platform.get_random_byte() & mask;
       }
 
       Instruction::WriteRegistersToMem(end_index) => {
         (0..=end_index.as_usize()).for_each(|reg_index| {
           let address = self.index_register + reg_index as i16;
-          self.memory[address.as_usize()] = self.registres[reg_index];
+          self.memory[address.as_usize()] = self.registers[reg_index];
         });
       }
 
       Instruction::LoadRegistersFromMem(end_index) => {
         (0..=end_index.as_usize()).for_each(|reg_index| {
           let address = self.index_register + reg_index as i16;
-          self.registres[reg_index] = self.memory[address.as_usize()]
+          self.registers[reg_index] = self.memory[address.as_usize()]
         });
       }
 
       Instruction::RegisterToBCD(reg_index) => {
-        let reg = self.registres[reg_index.as_usize()];
+        let reg = self.registers[reg_index.as_usize()];
 
         (0..=2).for_each(|offset| {
-          self.memory[self.index_register.as_usize() + offset] =
-            (reg / (10 * (offset + 1)) as u8) % 10;
-        })
+          let dev = 10_u8.pow(2 - offset);
+          self.memory[self.index_register.as_usize() + offset as usize] = reg / dev % 10;
+        });
       }
 
       Instruction::AddRegister(reg_index, value) => {
-        self.registres[reg_index.as_usize()] += value;
+        let reg = self.registers[reg_index.as_usize()];
+        self.registers[reg_index.as_usize()] = reg.wrapping_add(value);
       }
 
       Instruction::OrRegisters(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        self.registres[x_reg_index.as_usize()] = reg_x | reg_y;
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = reg_x | reg_y;
       }
 
       Instruction::AndRegisters(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        self.registres[x_reg_index.as_usize()] = reg_x & reg_y;
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = reg_x & reg_y;
       }
 
       Instruction::XorRegisters(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        self.registres[x_reg_index.as_usize()] = reg_x ^ reg_y;
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = reg_x ^ reg_y;
       }
 
       Instruction::AddAddressRegister(reg_index) => {
-        self.index_register += self.registres[reg_index.as_usize()] as i16;
+        self.index_register += self.registers[reg_index.as_usize()] as i16;
       }
 
       Instruction::AddRegisters(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        match reg_x.checked_add(reg_y) {
-          Some(value) => {
-            self.registres[x_reg_index.as_usize()] = value;
-            self.registres[15] = 0;
-          }
-          None => {
-            self.registres[15] = 1;
-          }
-        }
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        let (value, is_overflowed) = reg_x.overflowing_add(reg_y);
+        self.registers[x_reg_index.as_usize()] = value;
+        self.registers[15] = is_overflowed as u8;
       }
 
       Instruction::SubRegisters(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        match reg_x.checked_sub(reg_y) {
-          Some(value) => {
-            self.registres[x_reg_index.as_usize()] = value;
-            self.registres[15] = 1;
-          }
-          None => {
-            self.registres[15] = 0;
-          }
-        }
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        let (value, is_overflowed) = reg_x.overflowing_sub(reg_y);
+        self.registers[x_reg_index.as_usize()] = value;
+        self.registers[15] = !is_overflowed as u8;
       }
 
       Instruction::RShiftRegisters(x_reg_index, y_reg_index) => {
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        self.registres[x_reg_index.as_usize()] = reg_y >> 1;
-        self.registres[15] = reg_y & 0x1;
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = reg_y >> 1;
+        self.registers[15] = reg_y & 0x1;
       }
 
       Instruction::SubRegisterReversed(x_reg_index, y_reg_index) => {
-        let reg_x = self.registres[x_reg_index.as_usize()];
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        match reg_y.checked_sub(reg_x) {
-          Some(value) => {
-            self.registres[x_reg_index.as_usize()] = value;
-            self.registres[15] = 1;
-          }
-          None => {
-            self.registres[15] = 0;
-          }
-        }
+        let reg_x = self.registers[x_reg_index.as_usize()];
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        let (value, is_overflowed) = reg_y.overflowing_sub(reg_x);
+        self.registers[x_reg_index.as_usize()] = value;
+        self.registers[15] = !is_overflowed as u8;
       }
 
       Instruction::LShiftRegisters(x_reg_index, y_reg_index) => {
-        let reg_y = self.registres[y_reg_index.as_usize()];
-        self.registres[x_reg_index.as_usize()] = reg_y << 1;
-        self.registres[15] = reg_y & 0x80;
+        let reg_y = self.registers[y_reg_index.as_usize()];
+        self.registers[x_reg_index.as_usize()] = reg_y << 1;
+        self.registers[15] = (reg_y & 0x80) >> 7;
       }
 
       Instruction::ClearScreen => self.platform.clear_screen(),
@@ -200,10 +187,10 @@ impl<P: Platform> Interpreter<P> {
         let sprite = Sprite::new(&self.memory[mem_start..mem_end]);
 
         let pos = Point {
-          x: self.registres[x_reg.as_usize()],
-          y: self.registres[y_reg.as_usize()],
+          x: self.registers[x_reg.as_usize()],
+          y: self.registers[y_reg.as_usize()],
         };
-        self.registres[15] = self.platform.draw_sprite(pos, sprite) as u8;
+        self.registers[15] = self.platform.draw_sprite(pos, sprite) as u8;
       }
 
       Instruction::Jump(address) => {
@@ -212,8 +199,10 @@ impl<P: Platform> Interpreter<P> {
       }
 
       Instruction::Call(address) => {
-        self.stack.push(address);
-        self.instruction_address = address + instruction_step * ADDRESS_BYTE_STEP;
+        self
+          .stack
+          .push(self.instruction_address + ADDRESS_BYTE_STEP);
+        self.instruction_address = address;
         return Ok(());
       }
 
@@ -226,7 +215,7 @@ impl<P: Platform> Interpreter<P> {
       }
 
       Instruction::JumpV0(address) => {
-        self.instruction_address = address + self.registres[0] as i16;
+        self.instruction_address = address + self.registers[0] as i16;
         return Ok(());
       }
     }

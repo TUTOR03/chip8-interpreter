@@ -8,7 +8,7 @@ pub trait Executable {
 pub struct Chip8BaseExecutable<'a>(&'a [u8]);
 
 impl<'a> Chip8BaseExecutable<'a> {
-  const ENTRY_ADDRESS: Address = Address::new::<0x0>();
+  const ENTRY_ADDRESS: Address = Address::new::<0x200>();
 
   pub fn new(data: &'a [u8]) -> Self {
     Self(data)

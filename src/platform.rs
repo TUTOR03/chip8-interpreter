@@ -24,7 +24,7 @@ impl<'a> Sprite<'a> {
     self.data.iter().enumerate().flat_map(|(i, row)| {
       (0..8).filter_map(move |x| {
         let y = i as u8;
-        let val = row & (1 << x);
+        let val = row & (128 >> x);
         if val == 0 {
           return None;
         }
@@ -59,7 +59,7 @@ impl Default for ScreenFrame {
 }
 
 pub struct BasePlatform {
-  screen_frame: ScreenFrame,
+  pub screen_frame: ScreenFrame,
 }
 
 impl BasePlatform {
