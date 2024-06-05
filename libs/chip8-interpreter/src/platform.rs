@@ -1,38 +1,12 @@
+use super::sprite::{Point, Sprite};
+
 pub trait Platform {
   fn get_random_byte(&mut self) -> u8;
   fn draw_sprite(&mut self, pos: Point, sprite: Sprite) -> bool;
   fn clear_screen(&mut self);
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Point {
-  pub x: u8,
-  pub y: u8,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Sprite<'a> {
-  data: &'a [u8],
-}
-
-impl<'a> Sprite<'a> {
-  pub fn new(data: &'a [u8]) -> Self {
-    Self { data }
-  }
-
-  pub fn iter_pixels(&self) -> impl Iterator<Item = Point> + '_ {
-    self.data.iter().enumerate().flat_map(|(i, row)| {
-      (0..8).filter_map(move |x| {
-        let y = i as u8;
-        let val = row & (128 >> x);
-        if val == 0 {
-          return None;
-        }
-        Some(Point { x, y })
-      })
-    })
-  }
-}
+// BASE PLATFORM
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
