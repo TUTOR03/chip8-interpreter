@@ -11,17 +11,14 @@ impl Address {
   pub const SIZE: usize = 1 << Self::WIDTH;
   pub const MAX: Self = Self((Self::SIZE - 1) as u16);
 
-  #[inline]
   pub fn new<const VALUE: u16>() -> Self {
     Self(VALUE % Self::SIZE as u16)
   }
 
-  #[inline]
   pub fn as_u16(self) -> u16 {
     self.0
   }
 
-  #[inline]
   pub fn as_usize(self) -> usize {
     self.0 as usize
   }
@@ -36,7 +33,6 @@ impl fmt::Display for Address {
 impl TryFrom<u16> for Address {
   type Error = InterpreterError;
 
-  #[inline]
   fn try_from(value: u16) -> Result<Self, Self::Error> {
     if value > Self::MAX.0 {
       return Err(InterpreterError::AddressOverflow);
@@ -50,7 +46,6 @@ impl TryFrom<u16> for Address {
 impl Add<i16> for Address {
   type Output = Address;
 
-  #[inline]
   fn add(self, rhs: i16) -> Self::Output {
     Address(self.0.wrapping_add_signed(rhs) % Self::SIZE as u16)
   }
@@ -58,7 +53,6 @@ impl Add<i16> for Address {
 
 #[allow(clippy::suspicious_op_assign_impl)]
 impl AddAssign<i16> for Address {
-  #[inline]
   fn add_assign(&mut self, rhs: i16) {
     self.0 = self.0.wrapping_add_signed(rhs) % Self::SIZE as u16
   }

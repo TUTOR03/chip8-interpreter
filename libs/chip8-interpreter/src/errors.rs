@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum InterpreterError {
+  #[error("Interpreter crashed")]
+  Crashed,
   #[error("Unknown opcode: {0}")]
   UnknownOpCode(OpCode),
   #[error("Max nibble size exceeded. Should be less or equal {}", Nibble::MAX)]

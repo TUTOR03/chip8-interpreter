@@ -8,7 +8,6 @@ pub struct Point {
 pub struct Sprite<'a>(&'a [u8]);
 
 impl<'a> Sprite<'a> {
-  #[inline]
   pub fn new(value: &'a [u8]) -> Self {
     Self(value)
   }

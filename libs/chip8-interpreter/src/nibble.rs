@@ -10,17 +10,14 @@ impl Nibble {
   pub const SIZE: usize = 1 << Self::WIDTH;
   pub const MAX: Self = Self((Self::SIZE - 1) as u8);
 
-  #[inline]
   pub fn new<const VALUE: u8>() -> Self {
     Self(VALUE % Self::SIZE as u8)
   }
 
-  #[inline]
   pub fn as_u8(self) -> u8 {
     self.0
   }
 
-  #[inline]
   pub fn as_usize(self) -> usize {
     self.0 as usize
   }
@@ -35,7 +32,6 @@ impl fmt::Display for Nibble {
 impl TryFrom<u8> for Nibble {
   type Error = InterpreterError;
 
-  #[inline]
   fn try_from(value: u8) -> Result<Self, Self::Error> {
     if value > Self::MAX.0 {
       return Err(InterpreterError::NibbleOverflow);

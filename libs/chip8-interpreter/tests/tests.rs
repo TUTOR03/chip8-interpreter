@@ -1,14 +1,14 @@
-use chip8_interpreter::{BasePlatform, Chip8BaseExecutable, Interpreter, ScreenFrame};
+use chip8_interpreter::{BaseExecutable, BasePlatform, Interpreter, ScreenFrame};
 
 const TRUE_PIXEL: &str = "@";
 const FALSE_PIXEL: &str = ".";
 
 fn assert_display_result(image: &[u8], expected: &str, instruction_count: usize) {
   let base_platform = BasePlatform::new();
-  let executable = Chip8BaseExecutable::new(image);
+  let executable = BaseExecutable::new(image);
   let mut interpreter = Interpreter::new(base_platform, executable);
   for _ in 0..instruction_count {
-    interpreter.run_one_instruction().unwrap();
+    interpreter.run_next().unwrap();
   }
   assert_screen_frame_eq(&interpreter.platform().screen_frame, expected);
 }

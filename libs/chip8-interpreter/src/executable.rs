@@ -5,15 +5,16 @@ pub trait Executable {
   fn get_entry_point(&self) -> Address;
 }
 
-pub struct Chip8BaseExecutable<'a>(&'a [u8]);
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
+pub struct BaseExecutable<'a>(&'a [u8]);
 
-impl<'a> Chip8BaseExecutable<'a> {
+impl<'a> BaseExecutable<'a> {
   pub fn new(data: &'a [u8]) -> Self {
     Self(data)
   }
 }
 
-impl<'a> Executable for Chip8BaseExecutable<'a> {
+impl<'a> Executable for BaseExecutable<'a> {
   fn load_into_memory(&self, memory: &mut Memory) {
     let mem_start = Address::new::<0x200>();
     let mem_end = mem_start + self.0.len() as i16;

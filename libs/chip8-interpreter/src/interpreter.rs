@@ -19,6 +19,8 @@ pub struct Interpreter<P: Platform> {
   memory: Memory,
   instruction_address: Address,
   stack: Stack<Address, 16>,
+  expecting_key: Option<Nibble>,
+  is_crashed: bool,
 }
 
 const ADDRESS_BYTE_STEP: i16 = 2;
@@ -32,6 +34,8 @@ impl<P: Platform> Interpreter<P> {
       memory: Memory::new(),
       stack: Stack::new(),
       instruction_address: executable.get_entry_point(),
+      expecting_key: None,
+      is_crashed: false,
     };
 
     executable.load_into_memory(&mut res.memory);
@@ -42,7 +46,46 @@ impl<P: Platform> Interpreter<P> {
     &self.platform
   }
 
-  pub fn run_one_instruction(&mut self) -> Result<(), InterpreterError> {
+  pub fn run_next(&mut self) -> Result<(), InterpreterError> {
+    if self.is_crashed {
+      return Err(InterpreterError::Crashed);
+    }
+
+    if !self.try_consume_key_press() {
+      return Ok(());
+    }
+
+    let instruction_res = self.process_next_instruction();
+    if instruction_res.is_err() {
+      self.is_crashed = true;
+      return instruction_res;
+    }
+
+    Ok(())
+  }
+
+  fn try_consume_key_press(&mut self) -> bool {
+    let Some(reg_index) = self.expecting_key else {
+      return true;
+    };
+
+    let Some(key) = self.platform.get_last_pressed_key() else {
+      return false;
+    };
+
+    self.registers[reg_index] = key.as_u8();
+    self.expecting_key = None;
+    true
+  }
+
+  fn process_next_instruction(&mut self) -> Result<(), InterpreterError> {
+    if let Some(reg_index) = self.expecting_key {
+      if let Some(key) = self.platform.get_last_pressed_key() {
+        self.registers[reg_index] = key.as_u8();
+        self.expecting_key = None;
+      }
+    }
+
     let next_op_code = OpCode::from_bytes(
       self.memory[self.instruction_address],
       self.memory[self.instruction_address + 1],
@@ -79,6 +122,20 @@ impl<P: Platform> Interpreter<P> {
         }
       }
 
+      Instruction::SkipIfKeyDown(reg_index) => {
+        let key = Nibble::try_from(self.registers[reg_index])?;
+        if self.platform.is_key_down(key) {
+          instruction_step = 2;
+        }
+      }
+
+      Instruction::SkipIfKeyUp(reg_index) => {
+        let key = Nibble::try_from(self.registers[reg_index])?;
+        if !self.platform.is_key_down(key) {
+          instruction_step = 2;
+        }
+      }
+
       Instruction::SetRegister(reg_index, value) => {
         self.registers[reg_index] = value;
       }
@@ -93,6 +150,10 @@ impl<P: Platform> Interpreter<P> {
 
       Instruction::SetRegisterRandom(reg_index, mask) => {
         self.registers[reg_index] = self.platform.get_random_byte() & mask;
+      }
+
+      Instruction::GetDelayTimer(reg_index) => {
+        self.registers[reg_index] = self.platform.get_delay_timer();
       }
 
       Instruction::WriteRegistersToMem(end_index) => {
@@ -194,6 +255,18 @@ impl<P: Platform> Interpreter<P> {
         self.registers[Nibble::new::<15>()] = self.platform.draw_sprite(pos, sprite) as u8;
       }
 
+      Instruction::SetDelayTimer(reg_index) => {
+        self.platform.set_delay_timer(self.registers[reg_index]);
+      }
+
+      Instruction::SetSoundTimer(reg_index) => {
+        self.platform.set_sound_timer(self.registers[reg_index]);
+      }
+
+      Instruction::WaitForKeyDown(reg_index) => {
+        self.expecting_key = Some(reg_index);
+      }
+
       Instruction::Jump(address) => {
         self.instruction_address = address;
         return Ok(());
@@ -269,11 +342,14 @@ pub enum Instruction {
   SkipIfNotEqual(Nibble, u8),
   SkipIfRegistersEqual(Nibble, Nibble),
   SkipIfRegistersNotEqual(Nibble, Nibble),
+  SkipIfKeyDown(Nibble),
+  SkipIfKeyUp(Nibble),
   /* Запись регистров */
   SetRegister(Nibble, u8),
   CopyRegister(Nibble, Nibble),
   SetAddressRegister(Address),
   SetRegisterRandom(Nibble, u8),
+  GetDelayTimer(Nibble),
   WriteRegistersToMem(Nibble),
   LoadRegistersFromMem(Nibble),
   RegisterToBCD(Nibble),
@@ -291,6 +367,11 @@ pub enum Instruction {
   /* Экран */
   ClearScreen,
   DrawSprite(Nibble, Nibble, Nibble),
+  /* Таймеры */
+  SetDelayTimer(Nibble),
+  SetSoundTimer(Nibble),
+  /* Клавиатура */
+  WaitForKeyDown(Nibble),
   /* Работа с адресами */
   Jump(Address),
   JumpV0(Address),
@@ -317,11 +398,14 @@ impl TryFrom<OpCode> for Instruction {
       (0x9, .., 0x0) => {
         Instruction::SkipIfRegistersNotEqual(code.get_nibble(2), code.get_nibble(1))
       }
+      (0xE, _, 0x9, 0xE) => Instruction::SkipIfKeyDown(code.get_nibble(2)),
+      (0xE, _, 0xA, 0x1) => Instruction::SkipIfKeyUp(code.get_nibble(2)),
       /* Запись регистров */
       (0x6, ..) => Instruction::SetRegister(code.get_nibble(2), code.get_word(0)),
       (0x8, .., 0x0) => Instruction::CopyRegister(code.get_nibble(2), code.get_nibble(1)),
       (0xA, ..) => Instruction::SetAddressRegister(code.get_address()),
       (0xC, ..) => Instruction::SetRegisterRandom(code.get_nibble(2), code.get_word(0)),
+      (0xF, _, 0x0, 0x7) => Instruction::GetDelayTimer(code.get_nibble(2)),
       (0xF, _, 0x5, 0x5) => Instruction::WriteRegistersToMem(code.get_nibble(2)),
       (0xF, _, 0x6, 0x5) => Instruction::LoadRegistersFromMem(code.get_nibble(2)),
       (0xF, _, 0x3, 0x3) => Instruction::RegisterToBCD(code.get_nibble(2)),
@@ -341,6 +425,11 @@ impl TryFrom<OpCode> for Instruction {
       (0xD, ..) => {
         Instruction::DrawSprite(code.get_nibble(2), code.get_nibble(1), code.get_nibble(0))
       }
+      /* Таймеры */
+      (0xF, _, 0x1, 0x5) => Instruction::SetDelayTimer(code.get_nibble(2)),
+      (0xF, _, 0x1, 0x8) => Instruction::SetSoundTimer(code.get_nibble(2)),
+      /* Клавиатура */
+      (0xF, _, 0x0, 0xA) => Instruction::WaitForKeyDown(code.get_nibble(2)),
       /* Работа с адресами */
       (0x1, ..) => Instruction::Jump(code.get_address()),
       (0xB, ..) => Instruction::JumpV0(code.get_address()),

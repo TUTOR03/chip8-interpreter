@@ -1,37 +1,19 @@
+use crate::{screen::ScreenFrame, Nibble};
+
 use super::sprite::{Point, Sprite};
 
 pub trait Platform {
   fn get_random_byte(&mut self) -> u8;
   fn draw_sprite(&mut self, pos: Point, sprite: Sprite) -> bool;
   fn clear_screen(&mut self);
+  fn get_delay_timer(&self) -> u8;
+  fn set_delay_timer(&mut self, value: u8);
+  fn set_sound_timer(&mut self, value: u8);
+  fn is_key_down(&self, key: Nibble) -> bool;
+  fn get_last_pressed_key(&self) -> Option<Nibble>;
 }
 
-// BASE PLATFORM
-
-pub const SCREEN_WIDTH: usize = 64;
-pub const SCREEN_HEIGHT: usize = 32;
-
-pub struct ScreenFrame([[bool; SCREEN_WIDTH]; SCREEN_HEIGHT]);
-impl ScreenFrame {
-  pub fn new() -> Self {
-    Self([[false; SCREEN_WIDTH]; SCREEN_HEIGHT])
-  }
-
-  pub fn iter_rows(&self) -> impl Iterator<Item = &[bool; SCREEN_WIDTH]> {
-    self.0.iter()
-  }
-
-  pub fn iter_rows_mut(&mut self) -> impl Iterator<Item = &mut [bool; SCREEN_WIDTH]> {
-    self.0.iter_mut()
-  }
-}
-
-impl Default for ScreenFrame {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub struct BasePlatform {
   pub screen_frame: ScreenFrame,
 }
@@ -41,12 +23,6 @@ impl BasePlatform {
     Self {
       screen_frame: ScreenFrame::new(),
     }
-  }
-}
-
-impl Default for BasePlatform {
-  fn default() -> Self {
-    Self::new()
   }
 }
 
@@ -72,5 +48,24 @@ impl Platform for BasePlatform {
     });
 
     was_collision
+  }
+
+  fn get_delay_timer(&self) -> u8 {
+    todo!()
+  }
+
+  fn set_delay_timer(&mut self, value: u8) {
+    todo!()
+  }
+
+  fn set_sound_timer(&mut self, value: u8) {
+    todo!()
+  }
+
+  fn is_key_down(&self, key: Nibble) -> bool {
+    todo!()
+  }
+  fn get_last_pressed_key(&self) -> Option<Nibble> {
+    todo!()
   }
 }
