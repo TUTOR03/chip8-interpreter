@@ -2,6 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use super::nibble::Nibble;
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Registers([u8; Nibble::SIZE]);
 
 impl Registers {

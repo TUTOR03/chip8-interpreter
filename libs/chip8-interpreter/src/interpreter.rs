@@ -10,8 +10,10 @@ use crate::{
   registers::Registers,
   sprite::{Point, Sprite},
   stack::Stack,
+  SCREEN_HEIGHT, SCREEN_WIDTH,
 };
 
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Interpreter<P: Platform> {
   platform: P,
   registers: Registers,
@@ -42,8 +44,8 @@ impl<P: Platform> Interpreter<P> {
     res
   }
 
-  pub fn platform(&self) -> &P {
-    &self.platform
+  pub fn get_platform_mut(&mut self) -> &mut P {
+    &mut self.platform
   }
 
   pub fn run_next(&mut self) -> Result<(), InterpreterError> {
@@ -79,13 +81,6 @@ impl<P: Platform> Interpreter<P> {
   }
 
   fn process_next_instruction(&mut self) -> Result<(), InterpreterError> {
-    if let Some(reg_index) = self.expecting_key {
-      if let Some(key) = self.platform.get_last_pressed_key() {
-        self.registers[reg_index] = key.as_u8();
-        self.expecting_key = None;
-      }
-    }
-
     let next_op_code = OpCode::from_bytes(
       self.memory[self.instruction_address],
       self.memory[self.instruction_address + 1],
@@ -161,6 +156,7 @@ impl<P: Platform> Interpreter<P> {
           let address = self.index_register + reg_index as i16;
           self.memory[address] = self.registers[Nibble::try_from(reg_index as u8).unwrap()];
         });
+        self.index_register += (end_index.as_usize() + 1) as i16;
       }
 
       Instruction::LoadRegistersFromMem(end_index) => {
@@ -168,6 +164,7 @@ impl<P: Platform> Interpreter<P> {
           let address = self.index_register + reg_index as i16;
           self.registers[Nibble::try_from(reg_index as u8).unwrap()] = self.memory[address]
         });
+        self.index_register += (end_index.as_usize() + 1) as i16;
       }
 
       Instruction::RegisterToBCD(reg_index) => {
@@ -188,18 +185,21 @@ impl<P: Platform> Interpreter<P> {
         let reg_x = self.registers[x_reg_index];
         let reg_y = self.registers[y_reg_index];
         self.registers[x_reg_index] = reg_x | reg_y;
+        self.registers[Nibble::new::<15>()] = 0;
       }
 
       Instruction::AndRegisters(x_reg_index, y_reg_index) => {
         let reg_x = self.registers[x_reg_index];
         let reg_y = self.registers[y_reg_index];
         self.registers[x_reg_index] = reg_x & reg_y;
+        self.registers[Nibble::new::<15>()] = 0;
       }
 
       Instruction::XorRegisters(x_reg_index, y_reg_index) => {
         let reg_x = self.registers[x_reg_index];
         let reg_y = self.registers[y_reg_index];
         self.registers[x_reg_index] = reg_x ^ reg_y;
+        self.registers[Nibble::new::<15>()] = 0;
       }
 
       Instruction::AddAddressRegister(reg_index) => {
@@ -245,13 +245,16 @@ impl<P: Platform> Interpreter<P> {
       Instruction::ClearScreen => self.platform.clear_screen(),
 
       Instruction::DrawSprite(x_reg_index, y_reg_index, rows_count) => {
-        let x = self.registers[x_reg_index];
-        let y = self.registers[y_reg_index];
+        let reg_x = self.registers[x_reg_index];
+        let reg_y = self.registers[y_reg_index];
         let mem_start = self.index_register;
         let mem_end = self.index_register + rows_count.as_u8() as i16;
         let sprite = Sprite::new(&self.memory[mem_start..mem_end]);
 
-        let pos = Point { x, y };
+        let pos = Point {
+          x: reg_x % SCREEN_WIDTH as u8,
+          y: reg_y % SCREEN_HEIGHT as u8,
+        };
         self.registers[Nibble::new::<15>()] = self.platform.draw_sprite(pos, sprite) as u8;
       }
 
@@ -265,6 +268,7 @@ impl<P: Platform> Interpreter<P> {
 
       Instruction::WaitForKeyDown(reg_index) => {
         self.expecting_key = Some(reg_index);
+        self.try_consume_key_press();
       }
 
       Instruction::Jump(address) => {
@@ -286,7 +290,7 @@ impl<P: Platform> Interpreter<P> {
       }
 
       Instruction::JumpV0(address) => {
-        self.instruction_address = address + self.registers[Nibble::new::<15>()] as i16;
+        self.instruction_address = address + self.registers[Nibble::new::<0>()] as i16;
         return Ok(());
       }
     }

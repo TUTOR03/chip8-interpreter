@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut, Range};
+use std::ops::{Index, IndexMut, Range, RangeInclusive};
 
 use super::address::Address;
 
@@ -42,5 +42,19 @@ impl Index<Range<Address>> for Memory {
 impl IndexMut<Range<Address>> for Memory {
   fn index_mut(&mut self, range: Range<Address>) -> &mut Self::Output {
     &mut self.0[range.start.as_usize()..range.end.as_usize()]
+  }
+}
+
+impl Index<RangeInclusive<Address>> for Memory {
+  type Output = [u8];
+
+  fn index(&self, range: RangeInclusive<Address>) -> &Self::Output {
+    &self.0[range.start().as_usize()..=range.end().as_usize()]
+  }
+}
+
+impl IndexMut<RangeInclusive<Address>> for Memory {
+  fn index_mut(&mut self, range: RangeInclusive<Address>) -> &mut Self::Output {
+    &mut self.0[range.start().as_usize()..=range.end().as_usize()]
   }
 }

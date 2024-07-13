@@ -6,20 +6,21 @@ pub trait Executable {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
-pub struct BaseExecutable<'a>(&'a [u8]);
+pub struct BaseExecutable<'a> {
+  image: &'a [u8],
+  load_point: Address,
+}
 
 impl<'a> BaseExecutable<'a> {
-  pub fn new(data: &'a [u8]) -> Self {
-    Self(data)
+  pub fn new(image: &'a [u8], load_point: Address) -> Self {
+    Self { image, load_point }
   }
 }
 
 impl<'a> Executable for BaseExecutable<'a> {
   fn load_into_memory(&self, memory: &mut Memory) {
-    let mem_start = Address::new::<0x200>();
-    let mem_end = mem_start + self.0.len() as i16;
-
-    memory[mem_start..mem_end].copy_from_slice(self.0);
+    let mem_end = self.load_point + (self.image.len() - 1) as i16;
+    memory[self.load_point..=mem_end].copy_from_slice(self.image);
   }
 
   fn get_entry_point(&self) -> Address {
