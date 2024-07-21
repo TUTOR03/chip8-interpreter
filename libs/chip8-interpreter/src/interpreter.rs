@@ -53,8 +53,13 @@ impl<P: Platform> Interpreter<P> {
       return Err(InterpreterError::Crashed);
     }
 
-    if !self.try_consume_key_press() {
-      return Ok(());
+    if let Some(expecting_key_reg_index) = self.expecting_key {
+      let Some(pressed_key) = self.platform.get_last_pressed_key() else {
+        return Ok(());
+      };
+
+      self.registers[expecting_key_reg_index] = pressed_key.as_u8();
+      self.expecting_key = None;
     }
 
     let instruction_res = self.process_next_instruction();
@@ -64,20 +69,6 @@ impl<P: Platform> Interpreter<P> {
     }
 
     Ok(())
-  }
-
-  fn try_consume_key_press(&mut self) -> bool {
-    let Some(reg_index) = self.expecting_key else {
-      return true;
-    };
-
-    let Some(key) = self.platform.get_last_pressed_key() else {
-      return false;
-    };
-
-    self.registers[reg_index] = key.as_u8();
-    self.expecting_key = None;
-    true
   }
 
   fn process_next_instruction(&mut self) -> Result<(), InterpreterError> {
@@ -268,7 +259,7 @@ impl<P: Platform> Interpreter<P> {
 
       Instruction::WaitForKeyDown(reg_index) => {
         self.expecting_key = Some(reg_index);
-        self.try_consume_key_press();
+        self.platform.get_last_pressed_key();
       }
 
       Instruction::Jump(address) => {

@@ -45,8 +45,10 @@ impl<R: RandomGenerator> BasePlatform<R> {
 
     if is_down {
       self.keyboard[key_index].set_is_trackable(true);
+      self.last_pressed_key = None;
     } else if self.keyboard[key_index].is_trackable() {
       self.last_pressed_key = Some(key_index);
+      self.keyboard[key_index].set_is_trackable(false);
     }
   }
 
@@ -103,11 +105,6 @@ impl<R: RandomGenerator> Platform for BasePlatform<R> {
   }
 
   fn get_last_pressed_key(&mut self) -> Option<Nibble> {
-    let key = self.last_pressed_key.take();
-    self
-      .keyboard
-      .iter_mut()
-      .for_each(|key| key.set_is_trackable(false));
-    key
+    self.last_pressed_key.take()
   }
 }

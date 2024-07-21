@@ -19,6 +19,7 @@ pub use controlled_interpreter::{
 };
 pub use executable::{BaseExecutable, Executable};
 pub use interpreter::Interpreter;
+pub use keyboard::{Key, Keyboard};
 pub use nibble::Nibble;
 pub use platform::{BasePlatform, Platform};
 pub use screen::{ScreenFrame, SCREEN_HEIGHT, SCREEN_WIDTH};
